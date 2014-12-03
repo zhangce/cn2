@@ -52,27 +52,27 @@ CGROUP = 0
 os.system('mkdir -p _tmp_jobs/shared')
 os.system('cp common/localexec.py _tmp_jobs/shared')
 os.system('cp common/do.sh _tmp_jobs/shared')
-os.system('mkdir -p _tmp_jobs/job{}/_vertices'.format(CGROUP))
+os.system('mkdir -p _tmp_jobs/job{0}/_vertices'.format(CGROUP))
 
 for mergable in MERABLE_VERTICES:
-	os.system('mkdir -p _tmp_jobs/job{}/_vertices/{}'.format(CGROUP, mergable))
-	os.system('cp -r data/{}/state _tmp_jobs/job{}/_vertices/{}'.format(mergable, CGROUP, mergable))
-	os.system('touch _tmp_jobs/job{}/_vertices/{}/f.sh'.format(CGROUP, mergable))
+	os.system('mkdir -p _tmp_jobs/job{0}/_vertices/{1}'.format(CGROUP, mergable))
+	os.system('cp -r data/{0}/state _tmp_jobs/job{1}/_vertices/{2}'.format(mergable, CGROUP, mergable))
+	os.system('touch _tmp_jobs/job{0}/_vertices/{1}/f.sh'.format(CGROUP, mergable))
 
 
 for group in EXECUTION_GROUPs:
 
 	for v in EXECUTION_GROUPs[group]:
-		os.system('cp -r data/{} _tmp_jobs/job{}/_vertices'.format(v, CGROUP))
+		os.system('cp -r data/{0} _tmp_jobs/job{1}/_vertices'.format(v, CGROUP))
 
 	ct = ct + len(EXECUTION_GROUPs[group])
 	if ct % NJOB_PER_MACHINE == 0:
 		CGROUP = CGROUP + 1
-		os.system('mkdir -p _tmp_jobs/job{}/_vertices'.format(CGROUP))
+		os.system('mkdir -p _tmp_jobs/job{0}/_vertices'.format(CGROUP))
 		for mergable in MERABLE_VERTICES:
-			os.system('mkdir -p _tmp_jobs/job{}/_vertices/{}'.format(CGROUP, mergable))
-			os.system('cp -r data/{}/state _tmp_jobs/job{}/_vertices/{}'.format(mergable, CGROUP, mergable))
-			os.system('touch _tmp_jobs/job{}/_vertices/{}/f.sh'.format(CGROUP, mergable))
+			os.system('mkdir -p _tmp_jobs/job{0}/_vertices/{1}'.format(CGROUP, mergable))
+			os.system('cp -r data/{0}/state _tmp_jobs/job{1}/_vertices/{2}'.format(mergable, CGROUP, mergable))
+			os.system('touch _tmp_jobs/job{0}/_vertices/{1}/f.sh'.format(CGROUP, mergable))
 
 ## Execute
 
