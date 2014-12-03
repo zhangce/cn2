@@ -1,1 +1,0 @@
-echo "MERGE 3"

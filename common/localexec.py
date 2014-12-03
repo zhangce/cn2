@@ -10,7 +10,7 @@ NEPOCH = int(sys.argv[1])
 #
 LIST_OF_VERTEX = []
 for f in os.listdir('_vertices'):
-	if os.path.isdir('_vertices/' + f):
+	if os.path.isdir('_vertices/' + f) and os.path.getsize('_vertices/' + f + '/f.sh') > 0:
 		LIST_OF_VERTEX.append('_vertices/' + f)
 
 	#for f in LIST_OF_VERTEX:
