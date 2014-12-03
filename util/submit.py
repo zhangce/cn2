@@ -27,7 +27,7 @@ MERABLE_VERTICES = {}
 for v in VERTICES:
 	if VERTICES[v]['mergable'] == True:
 		MERABLE_VERTICES[v] = 1
-print "~~~~~", MERABLE_VERTICES
+#print "~~~~~", MERABLE_VERTICES
 
 #### Then, decompose the graph into
 # multiple connected components that

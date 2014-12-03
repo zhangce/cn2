@@ -102,4 +102,5 @@ for iepoch in range(0, NEPOCH):
 			ExecutedJobs[job] = 1
 				# TODO fault tolerance
 
+os.system('echo "SUC" > SUCCEED.txt')
 
