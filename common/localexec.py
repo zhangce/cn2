@@ -31,7 +31,7 @@ def execute(job):
 
 	# first, check whether the job is executable
 	if len(INPUT_SOCKETS) == len(JOBINPUTQUEUE[job]):
-		os.system('sh {}/f.sh'.format(job))
+		os.system('sh {0}/f.sh'.format(job))
 
 		for socket in JOBINPUTQUEUE[job]:
 			os.close(socket)
@@ -45,7 +45,7 @@ def execute(job):
 	socket_to_input = {}
 	for input in INPUT_SOCKETS:
 		if input not in finished_inputs:
-			socket = os.open('_closures/{}'.format(input), os.O_NONBLOCK)
+			socket = os.open('_closures/{0}'.format(input), os.O_NONBLOCK)
 			sockets.append(socket)
 			socket_to_input[socket] = input
 
@@ -75,13 +75,13 @@ def init(job):
 		if os.path.isfile('_closures/' + input): 
 			continue
 		if not os.path.getsize(job + '/neighbors/' + input) > 0:
-			os.system('mkfifo _closures/{}'.format(input))
+			os.system('mkfifo _closures/{0}'.format(input))
 		else:
 			for l in open(job + '/neighbors/' + input):
 				if l.rstrip() == 'AVERAGE':
-					os.system('touch _closures/{}'.format(input))
+					os.system('touch _closures/{0}'.format(input))
 				else:
-					os.system('mkfifo _closures/{}'.format(input))
+					os.system('mkfifo _closures/{0}'.format(input))
 				break
 
 	return 0
