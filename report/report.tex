@@ -263,12 +263,128 @@ standard numerical methods to search for (local) minimal
 of this function.
 
 
-\section{Performance Study}
+\paragraph*{Extension to Spot Instances of EC2}
 
-We describe 
+We describe how our design could be extended to spot instances
+on EC2 easily, with a few twists. Compared with a Condor-based
+environment, spot instances lack the ability the automatically
+schedule a job (e.g., copy data, execute, and copy data back
+to master). Therefore, we twist our Condor-based implementation
+in the following ways.
+\begin{enumerate}
+\item {\bf Default AMI.} We create a user-defined AMI that contains
+the following routine: (1) When the AMI starts, it starts a daemon
+that pings the master IP, which is stored in the AMI; (2) it
+automatically downloads a chunk of jobs from an address provided
+by the master; (3) it starts execution of a binary that is
+already in the AMI; (4) it copies results back when finished
+and evicted.
+\item {\bf Master Worker.} The master worker has a simple twist
+that it manages the copy of jobs to the remote worker by itself
+by passing the local path name to enable \texttt{scp} from 
+the remote worker. 
+\end{enumerate}
+
+We implement this strategy and uses \$0.1 to bid 100 c1.xlarge
+instance that has 4 virtual CPU. We report the performance in 
+Section~\ref{sec:perf}.
+
+\section{Performance Study} \label{sec:perf}
+
+We describe experiments that validate the performance of our systems.
+We first describe the end-to-end experiments, and then two
+experiments about choosing chunk size and executing jobs on EC2.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/result-crop}
+\caption{An Illustration of the MNIST datasets with
+example predictions and accuracy of our prototype system.}
+\label{fig:mnist}
+\end{figure}
 
 
+\subsection{End-to-end Experiment}
 
+We validate that our prototype system is able to conduct
+learning of Deep Neural Network on standard benchmark dataset
+efficiently.
+
+\paragraph*{Data Sets} We conduct experiment on two standard
+benchmark datasets, namely ImageNet and MNIST. MNIST is the
+{\em de facto} benchmark of handwriting recognition that contains
+60K 28$\times$28 images illustrated as in Figure~\ref{fig:mnist}. ImageNet
+focuses on image recognition and is one of the largest corpus
+that contains 1.8M images. After following state-of-the-art to
+resize the images in ImageSize into 224$\times$224, the whole
+corpus is 46GB.
+
+\paragraph*{Protocol} We execute the DNN application with the
+code we described in previous sections. We select the time with
+our analytic model with deterministic failure. The master
+machine has two 6-core 2.4GHz Xeon CPUs and 128GB RAM.
+We record the time for one training epoch of both corpus
+and also calculate the number of floating point operations
+we can do per second (GFLOPS). Because existing framework
+cannot be installed on Condor, it is hard to compare with them.
+Therefore, we compare our system with a single-GPU implementation
+with Nvidia Titan, one of the toppest GPUs available on the market.
+
+\paragraph*{Result} Our run on ImageNet finishes a single
+iteration in 0.87 hours. Compared with the execution time of
+GPU, we are 3.1$\times$ faster. At peak time, we harvest
+2.6K cores on Condor, and around 12T FLOPS. It is not surprising
+that our distributed implementation is only 3 times faster
+than a single GPU for two reasons. First, a single GPU contains
+more than 20000 computation units, and therefore is of roughly
+the same size as the number of cores we harvest on Condor.
+Second, many machines on Condor are relatively old, and only 12\%
+of the machines we harvested support AVX. For machines that
+AVX is not supported, we can only do less than 4 single-precision
+floating point operations per CPU cycle.
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/chunk-crop}
+\caption{The Selection of Chunk Sizes.}
+\label{fig:chunksize}
+\end{figure}
+
+
+\subsection{Chunk Size Selection}
+
+We validate that our analytic model for chunk size selection
+achieves a near optimal selection. We use our deterministic
+failure model, and vary the number of nodes per Condor job.
+To conduct the experiment, we replicate the MNIST datasets
+to create 1M jobs. We plot the ratio of execution
+time and total execution time in Figure~\ref{fig:chunksize}.
+
+From Figure~\ref{fig:chunksize} we see that, consistent
+with our expectation, there exists an optimal chunk size
+when we vary the chunk size. The choice of a suboptimal
+chunk size could be catastrophic and can be up to
+two orders of magnitude less efficient than the optimal choice.
+Our analytic model is able to select a near optimal
+chunk size, which is within 25\% of the optimal choice.
+
+\subsection{Running on Amazon EC2}
+
+We report our preliminary result of running our prototype
+systems on Amazon EC2. We bid 100 c1.xlarge instances with 
+the price of \$0.1. Each c1.xlarge instance has
+4 virtual CPU, and we also find that AVX2 is supported, and
+therefore, the peak performance is 16 floating point
+operation per cycle for mused MUL and ADD instructions.
+Our bided price is too high such that all 100 instances
+keep running for one hour. This gives us 4.5T FLOPS.
+Because we cost \$0.002 per second, this is 2250T FLOPS/\$.
+
+We hoped to lower the price and expect that to give us
+more interesting result. However, any sanely designed
+experiments in our mind would take more than \$100. Therefore,
+we did not conduct these experiments.
 
 \bibliographystyle{abbrv}
 \bibliography{report}
