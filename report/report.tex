@@ -4,8 +4,7 @@
 \usepackage{graphicx}
 \usepackage{verbatim}
 \usepackage{listings}
-
-
+\usepackage{amsfonts}
 
 \title{Distributed Graph Processing for Machine Learning:\\
 The Case for Condor and Spot Instances}
@@ -155,15 +154,144 @@ Figure~\ref{fig:env} illustrates the difference between
 a dedicated cluster, Condor instances, and EC2 instances.
 We describe their difference as follows.
 
-\paragraph*{Dedicated Cluster}
+\paragraph*{Dedicated Cluster} The dedicated cluster
+that existing work assumes usually contains two components:
+(1) a set of master machines; and (2) a set of worker machines.
+In some frameworks, master machines and worker machines
+could overlap. A dedicated cluster starts from a given
+set of machines, and when the job starts, this number is
+known to the system. Therefore, one could use techniques
+like consistent hashing to allocate resources. Faults
+are assumed for both worker and master, and therefore,
+one could use techniques like chain replication. However,
+the failure rate is usually low compared with the two scenario
+that we are going to discuss later.
+
+\paragraph*{Condor} Figure~\ref{fig:env}(b) illustrates
+the case for Condor. Similar to dedicated cluster, there
+are workers and masters. The cluster starts with only
+master machines and zero workers. During execution,
+workers are added to the pool periodically, but also
+fail periodically. According to the statistics we get
+from OSG, the same worker usually has a life span around
+45 minutes, which means, after 45 minutes a worker will
+exit. Usually, workers cannot communicate with each other
+because they are behind the firewall of different organizations
+cross the country.
+
+\paragraph*{EC2 Spot Instances} The spot instances
+of EC2 has similar structure with Condor. New instances
+will be added into the pool when the bidding price is
+higher than the market price; and instances will be removed
+from the pool when the bidding price is lower than
+the market price. Because the market price is unknown and
+keep changing dynamically, there is no way for the master
+to know beforehand the number of worker machines.
+
+\subsection{Language Extension}
+
+\subsection{Execution Model}
 
 
-\paragraph*{Condor}
+\paragraph*{Deciding the Chunk Size}
+
+One key parameter that we need to decide is the
+chunk size, that is the number of nodes we can
+put in a single job. We apply standard queueing
+theory to estimate this parameter. 
+
+Let $N$ be the total number of vertex, and $t_{exec}$
+be the time that a single vertex needs to
+finish execution. Let $t_s$ and $t_e$ be the time
+that Condor needs to start and end a job. Let
+$t_c$ be the time that each vertex require to copy
+to the worker.
+Let $T$ be the time that a Condor worker can execute
+before getting killed. Let $n$ be the number of 
+vertex we put in a single Condor job.
+%
+We have that there are $N/n$ Condor jobs, each of which
+takes $nt_{exec}$ time to execute. 
+
+\subparagraph*{Infinite Bandwidth with Deterministic Failure}
+
+We first assume that the master has infinite bandwidth,
+and therefore, no matter how many jobs we have, they
+do not interfere with each other. In this case, let
+$M$ be the number of Condor machines we get, the
+total execution time is
+\[
+TotalTime(n) = \frac{N}{n} \mathbb{I}_{T>n(t_c+t_{exec})} \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+If we want to maximize
+\[
+\frac{Nt_{exec}}{TotalTime(n)}
+\]
+we just need to set
+\[
+T=n(t_c+t_{exec}).
+\]
+
+\subparagraph*{Infinite Bandwidth with Stochastic Failure}
+
+Our previous analysis assumes that Condor jobs fail
+deterministically after time $T$. A more tight and realistic
+analysis is to assume this parameter is stochastic. For example,
+let $T\sim\mathcal{N}(\mu, \sigma^2)$ be a Gaussian random variable.
+Now $TotalTime(n)$ becomes a random variable.
+Instead of analyzing this random variable as a whole, let's
+look at a single job.
+\[
+TimeOfAJob(n) = \mathbb{I}_{T>n(t_c+t_{exec})} \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+The expectation of this random variable is
+\[
+\mathbb{E}\left[TimeOfAJob(n)\right] = \Pr[T>n(t_c+t_{exec})] \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+Let $\Phi_{\mu,\sigma}$ be the quantile function
+of the Gaussian distribution, we have
+\[
+\mathbb{E}\left[TimeOfAJob(n)\right] = \Phi(n(t_c+t_{exec})) \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+Trivially, the expectation of $TotalTime(n)$ becomes
+\[
+\mathbb{E}\left[TotalTime(n)\right] = \frac{N}{n} \Phi(n(t_c+t_{exec})) \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+The best chunk size should be the one that minimizes this 
+expectation. However, it is well-known that the quantile
+function of Gaussian cannot be expressed in closed form in 
+terms of elementary functions; therefore, one can use
+standard numerical methods to search for (local) minimal
+of this function.
 
 
-\paragraph*{EC2 Spot Instances}
+\paragraph*{Extension to Spot Instances of EC2}
 
+We describe how our design could be extended to spot instances
+on EC2 easily, with a few twists. Compared with a Condor-based
+environment, spot instances lack the ability the automatically
+schedule a job (e.g., copy data, execute, and copy data back
+to master). Therefore, we twist our Condor-based implementation
+in the following ways.
+\begin{enumerate}
+\item {\bf Default AMI.} We create a user-defined AMI that contains
+the following routine: (1) When the AMI starts, it starts a daemon
+that pings the master IP, which is stored in the AMI; (2) it
+automatically downloads a chunk of jobs from an address provided
+by the master; (3) it starts execution of a binary that is
+already in the AMI; (4) it copies results back when finished
+and evicted.
+\item {\bf Master Worker.} The master worker has a simple twist
+that it manages the copy of jobs to the remote worker by itself
+by passing the local path name to enable \texttt{scp} from 
+the remote worker. 
+\end{enumerate}
 
+We implement this strategy and uses \$0.1 to bid 100 c1.xlarge
+instance that has 4 virtual CPU. We report the performance in 
+Section~\ref{sec:perf}.
+
+<<<<<<< HEAD
 \subsection{User Interface}
 \subsubsection{Language Extension}
 
@@ -240,7 +368,103 @@ We define \textsf{f.cpp} for the image vertices and \textsf{g.cpp} for the
 
 \subsection{Execution Model}
 We have two kinds of vertices and also two kinds of workers. 
-\section{Performance Study}
+\section{Performance Study} \label{sec:perf}
+
+We describe experiments that validate the performance of our systems.
+We first describe the end-to-end experiments, and then two
+experiments about choosing chunk size and executing jobs on EC2.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.5\textwidth]{figures/result-crop}
+\caption{An Illustration of the MNIST datasets with
+example predictions and accuracy of our prototype system.}
+\label{fig:mnist}
+\end{figure}
+
+
+\subsection{End-to-end Experiment}
+
+We validate that our prototype system is able to conduct
+learning of Deep Neural Network on standard benchmark dataset
+efficiently.
+
+\paragraph*{Data Sets} We conduct experiment on two standard
+benchmark datasets, namely ImageNet and MNIST. MNIST is the
+{\em de facto} benchmark of handwriting recognition that contains
+60K 28$\times$28 images illustrated as in Figure~\ref{fig:mnist}. ImageNet
+focuses on image recognition and is one of the largest corpus
+that contains 1.8M images. After following state-of-the-art to
+resize the images in ImageSize into 224$\times$224, the whole
+corpus is 46GB.
+
+\paragraph*{Protocol} We execute the DNN application with the
+code we described in previous sections. We select the time with
+our analytic model with deterministic failure. The master
+machine has two 6-core 2.4GHz Xeon CPUs and 128GB RAM.
+We record the time for one training epoch of both corpus
+and also calculate the number of floating point operations
+we can do per second (GFLOPS). Because existing framework
+cannot be installed on Condor, it is hard to compare with them.
+Therefore, we compare our system with a single-GPU implementation
+with Nvidia Titan, one of the toppest GPUs available on the market.
+
+\paragraph*{Result} Our run on ImageNet finishes a single
+iteration in 0.87 hours. Compared with the execution time of
+GPU, we are 3.1$\times$ faster. At peak time, we harvest
+2.6K cores on Condor, and around 12T FLOPS. It is not surprising
+that our distributed implementation is only 3 times faster
+than a single GPU for two reasons. First, a single GPU contains
+more than 20000 computation units, and therefore is of roughly
+the same size as the number of cores we harvest on Condor.
+Second, many machines on Condor are relatively old, and only 12\%
+of the machines we harvested support AVX. For machines that
+AVX is not supported, we can only do less than 4 single-precision
+floating point operations per CPU cycle.
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.4\textwidth]{figures/chunk-crop}
+\caption{The Selection of Chunk Sizes.}
+\label{fig:chunksize}
+\end{figure}
+
+
+\subsection{Chunk Size Selection}
+
+We validate that our analytic model for chunk size selection
+achieves a near optimal selection. We use our deterministic
+failure model, and vary the number of nodes per Condor job.
+To conduct the experiment, we replicate the MNIST datasets
+to create 1M jobs. We plot the ratio of execution
+time and total execution time in Figure~\ref{fig:chunksize}.
+
+From Figure~\ref{fig:chunksize} we see that, consistent
+with our expectation, there exists an optimal chunk size
+when we vary the chunk size. The choice of a suboptimal
+chunk size could be catastrophic and can be up to
+two orders of magnitude less efficient than the optimal choice.
+Our analytic model is able to select a near optimal
+chunk size, which is within 25\% of the optimal choice.
+
+\subsection{Running on Amazon EC2}
+
+We report our preliminary result of running our prototype
+systems on Amazon EC2. We bid 100 c1.xlarge instances with 
+the price of \$0.1. Each c1.xlarge instance has
+4 virtual CPU, and we also find that AVX2 is supported, and
+therefore, the peak performance is 16 floating point
+operation per cycle for mused MUL and ADD instructions.
+Our bided price is too high such that all 100 instances
+keep running for one hour. This gives us 4.5T FLOPS.
+Because we cost \$0.002 per second, this is 2250T FLOPS/\$.
+
+We hoped to lower the price and expect that to give us
+more interesting result. However, any sanely designed
+experiments in our mind would take more than \$100. Therefore,
+we did not conduct these experiments.
+>>>>>>> c8288e5811db72fdeba8a3845dbae82d21275f94
 
 \bibliographystyle{abbrv}
 \bibliography{report}
