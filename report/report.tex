@@ -53,24 +53,24 @@ able to achieve more than 12TFLOPS on Condor with more than
 Machine learning has been one emerging area that
 attracts interests from the community of system 
 research, especially research of 
-distributed systems~\cite{Li:2014:OSDI,GraphLab:OSDI}. 
-Notable example including GraphLab~\cite{GraphLab:OSDI},
+distributed systems~\cite{Li:2014:OSDI,GraphLab:OSDI,Spark,Google,Yahoo}. 
+Notable examples include GraphLab~\cite{GraphLab:OSDI},
 Spark~\cite{Spark}, Google's DistBelief~\cite{Google}, and 
 Yahoo's Parameter Server~\cite{Yahoo,Li:2014:OSDI}. 
 In this work, we focus on the same goal, that is 
 to build a framework that supports executing machine 
-learning applications in an distributed environment.
+learning applications in a distributed environment.
 
 It has been a common practice for distributed machine
 learning systems to be run on dedicated clusters.
-For example, both Spark and GraphLab has been 
+For example, both Spark and GraphLab have been 
 reported to be able to execute machine learning algorithms
 on hundreds of machines; DistBelief is able to 
 train deep neural network on 6000 machines; and 
 Parameter Server is able to scale to 1000 machines.
 Our key observation is that existing frameworks~\cite{Li:2014:OSDI,
 GraphLab:OSDI,Spark,Google,Yahoo} implicitly
-make {\em at least one} of the following two assumption
+make {\em at least one} of the following two assumptions
 about the distributed environment and workload:
 
 \begin{enumerate}
@@ -82,7 +82,7 @@ existing systems to schedule their workload before
 execution. For example, Yahoo's Parameter Server
 uses consistent hashing~\cite{Li:2014:OSDI} to allocate
 resources and workers, and use chain replication to
-deal worker failures. GraphLab~\cite{GraphLab:OSDI} also
+deal with worker failures. GraphLab~\cite{GraphLab:OSDI} also
 uses similar approaches. 
 \item The graph to be processed consists of nodes that are 
 executed with the same level of consistency. For example,
@@ -93,7 +93,7 @@ graph will follow the same level.
 
 These assumptions are often true in the environment that
 these systems are designed for, in which the cluster is
-maintained in a centralized way or leased with cloud-based
+maintained in a centralized way or leased from cloud-based
 services (e.g., EC2). However, this assumption
 does not always hold for a popular environment that
 often be called {\em high throughput computation} (HTC) 
@@ -104,11 +104,11 @@ Another example is the spot instance on Amazon EC2, which
 relies on a bidding-based model that could provide much
 cheaper solution than traditional cloud-based instances.
 These HTC environments have the characteristics that are
-different to the above two assumptions when applied to 
+different from the above two assumptions when applied to 
 machine learning.
 
 \begin{enumerate}
-\item The coordinators does not know the set of workers
+\item The coordinators do not know the set of workers
 {\em a priori}. For example, in Condor, the coordinator
 does not know how many workers will be assigned to it, and
 what type of machines will be assigned to it. Also, the
@@ -162,7 +162,7 @@ In some frameworks, master machines and worker machines
 could overlap. A dedicated cluster starts from a given
 set of machines, and when the job starts, this number is
 known to the system. Therefore, one could use techniques
-like consistent hashing to allocate resources. Faults
+like consistent hashing to allocate resources. Failures
 are assumed for both worker and master, and therefore,
 one could use techniques like chain replication. However,
 the failure rate is usually low compared with the two scenario
@@ -176,7 +176,8 @@ workers are added to the pool periodically, but also
 fail periodically. According to the statistics we get
 from OSG, the same worker usually has a life span around
 45 minutes, which means, after 45 minutes a worker will
-exit. Usually, workers cannot communicate with each other
+exit with a large probability. Usually, workers cannot 
+communicate with each other
 because they are behind the firewall of different organizations
 cross the country.
 
@@ -189,8 +190,14 @@ the market price. Because the market price is unknown and
 keep changing dynamically, there is no way for the master
 to know beforehand the number of worker machines.
 
-\subsection{User Interface}
-\subsubsection{Language Extension}
+\subsection{Language Extension}
+
+We first describe the formal model of our language extension,
+and the vertex-centric API we provide for the user to specify
+machine learning algorithms as graph-processing workloads.
+This language extension is motivated by the observation that
+different vertices could have different requirement of consistency.
+
 \paragraph{Language Model of GraphLab} Let $G=(V,E)$ be a graph, where 
 $V$ is a set of vertex and
 $E\subseteq V^2$ is a set of edges between vertices. Given a vertex $v \in V$,
@@ -199,23 +206,33 @@ $E\subseteq V^2$ is a set of edges between vertices. Given a vertex $v \in V$,
 %let $(N_v^{(V)}, N_v^{(E)}$ be the data of vertex and edges that are neighbors 
 %of $v$.\\
 Let $N(v)$ be the set of neighbouring vertices with $v$. Denote the state of 
-vertex $v$ in beginning of the $i$th iteration as $v^{i}$, and the states of 
-its neigbouring vertices in the beginning of the $i$th iteration as $N_v(i)$.\\
+vertex $v$ in beginning of the $i$th iteration as $v^{(i)}$, and the states of 
+its neigbouring vertices in the beginning of the $i$th iteration as $N(v)^{(i)}$.
 In GraphLab, the user defines a function $f$ for vertex $v$ that does the 
-following:\\
-\begin{eqnarray*}
- v^{(i+1)}, N_v^{(i+1)} \leftarrow f(v^{(i)}, N(v)^{(i)})
-\end{eqnarray*}
+following:
+\[
+ v^{(i+1)}, N(v)^{(i+1)} \leftarrow f(v^{(i)}, N(v)^{(i)})
+\]
 
 \paragraph{Extension} We propose to extend the language of GraphLab as follows. 
 We first describe this extension,
 and then explain the intuition behinds it.
 For each vertex $v\in V$, we extend the GraphLab language with an additional 
 function $agg(v)$ that does the
-following:$v^{(i+1)}\leftarrow g(v^{(i)}, v'^{(i)})$, where $v$ and $v'$ are 
-two replicas of the same vertex. With this extension, the graph we want to 
-support could have different types of vertex.	Add Figure here?
+following: 
+\[
+v^{(i+1)}\leftarrow g(v^{(i)}, v'^{(i)}),
+\]
+where $v$ and $v'$ are 
+two replicas of the same vertex. With this extension, we
+could partition the graph into smaller pieces
+by introducing replicas of vertex and resolve conflicts
+using this aggregation function.
+
 \subsubsection{Vertex-centric APIs}
+
+We describe the API we provided for the user to implement
+the formal model we just described.
 A vertex in the graph is modeled by the \textsf{Vertex} data structure:
 \begin{verbatim}
 class Vertex {
@@ -226,14 +243,16 @@ class Vertex {
 \end{verbatim}
 We expose baisc operations of a vertex, including viewing and updating the 
 value of itself and its neighbours. The APIs are shown in 
-Table~\cite{table:api}. The APIs enable programmers to make queries 
+Figure~\ref{fig:api}. This API enable programmers to make queries 
 from the perspective of a vertex (in a vertex-centric way). 
-\begin{table}
+
+\begin{figure}
   \centering
- \begin{tabular}{|c|c|}
- \hline
+  \small
+ \begin{tabular}{l|l}
  \hline
  Function & Usage\\
+ \hline
  NodeIdType getNodeId() & Get the id of this vertex.\\
  VertexData$\langle$T$\rangle$ getData() & Get the data of this vertex.\\
  vector$\langle$Vertex$\langle$T$\rangle$ $\rangle$\ getNeighbours() & Get all 
@@ -241,19 +260,18 @@ the neighbour information.\\
  void updateValue(NodeIdType nodeId, VertexData$\langle$T$\rangle$ val) & Update 
 the value of vertex nodeId to val.\\
  \hline
- \hline
  \end{tabular}
  \caption{APIs and Usage}
- \label{table:api}
-\end{table}
+ \label{fig:api}
+\end{figure}
 
 \subsubsection{Example of Deep Neural Network for Image Recongnition}
-We illustrate the usage of the system by the example of deep	neural	network	
-for image recognition. In the \textbf{DNN}, we have two kind of vertices, one 
+We illustrate the usage of the system by the example of deep neural
+network	for image recognition. In DNN, we have two kind of vertices, one 
 being the vertex that stores the real image data and the other being the neural 
 network vertex that contains the parameters to learn. 
 We define \textsf{f.cpp} for the image vertices and \textsf{g.cpp} for the 
-"averagble" neural netowrk vertex, as shown in Listing~\ref{lst:f}~\ref{lst:g}.
+``averagble'' neural netowrk vertex, as shown in Listing~\ref{lst:f}~\ref{lst:g}.
 \begin{lstlisting}[language=java,basicstyle={\ttfamily\small},caption={f.cpp},label={lst:f},frame=single]
  int main(){ 
    // get vertex content
@@ -291,39 +309,43 @@ The vertices have difference levels of consistency, correspondingly, we have
 different types of workers. We denote the vertices that don't have $agg$ 
 function as type $A$ and otherwise type $B$. We define two kinds of workers:
 \begin{itemize}
- \item \textbf{Remote worker} Responsible for type $A$ vertices. Typically 
-deployed on unreliable low-end servers, such as condor servers.
- \item \textbf{Master worker} Responsible for type $B$ vertices. Typically 
-deployed on reliable high-end servers.
+ \item \textbf{Remote workers} are responsible for type $A$ vertices. Typically we 
+deploy these workers on unreliable low-end servers, such as condor servers.
+ \item \textbf{Master workers} are responsible for type $B$ vertices. Typically we 
+deployed these workers on reliable high-end servers.
 \end{itemize}
+
 We first decompose the graph into different connected components by introducing 
-replicas for "averagble" vertices. add figure here.
-If there are no "averagble" vertices in the graph, we follow the BSP mode of 
+replicas for ``averagble'' vertices.
+If there are no ``averagble'' vertices in the graph, we follow the BSP mode of 
 GraphLab to uniformly partition the graph.
+Each Condor job contains a set of vertices in the same partition.
 In every iteration, the master node submits all Condor jobs.
-\paragraph{Remote Worker}
-Run $f()$ for every type $A$ vertices, which reads the local copy of type $B$ 
+The execution model for each type of workers is as follows:
+
+\begin{itemize}
+\item \textbf{Remote workers.} Run $f()$ for every type $A$ vertices, which reads the local copy of type $B$ 
 vertices and update the local copy of type $B$ vertices. (All “updates” are 
 atomic, meaning that no read operation will read a parital update.)
-\paragraph{Master Worker}
-For each Condor job that is running, read the remote copy of type $B$ vertices, 
-run $g()$ to average with local copy, and 'scp' it to the running Condor job. 
+\item \textbf{Master workers.} For each Condor job that is running, read the remote copy of type $B$ vertices, 
+run $g()$ to average with local copy, and \texttt{scp} it to the running Condor job. 
 This step happens in an asynchronized way. For each finished Condor job, reads 
-its final state of type $B$ vertices, run $g()$ to averge with the local copy 
-and update the local copy.\\
+its final state of type $B$ vertices, run $g()$ to average with the local copy 
+and update the local copy.
+\end{itemize}
 
 \paragraph*{Deciding the Chunk Size}
 
 One key parameter that we need to decide is the
-chunk size, that is the number of nodes we can
-put in a single job. We apply standard queueing
-theory to estimate this parameter. 
+chunk size, that is the number of vertices we
+put in a single Condor job. We develop the following
+analytic model to estimate this parameter. 
 
 Let $N$ be the total number of vertex, and $t_{exec}$
 be the time that a single vertex needs to
 finish execution. Let $t_s$ and $t_e$ be the time
 that Condor needs to start and end a job. Let
-$t_c$ be the time that each vertex require to copy
+$t_c$ be the time that each vertex requires to copy
 to the worker.
 Let $T$ be the time that a Condor worker can execute
 before getting killed. Let $n$ be the number of 
@@ -334,10 +356,11 @@ takes $nt_{exec}$ time to execute.
 
 \subparagraph*{Infinite Bandwidth with Deterministic Failure}
 
-We first assume that the master has infinite bandwidth,
+We assume that the master has infinite bandwidth (which
+is usually the case for computationally expensive
+workload such as DNN),
 and therefore, no matter how many jobs we have, they
-do not interfere with each other. In this case, let
-$M$ be the number of Condor machines we get, the
+do not interfere with each other. In this case, the
 total execution time is
 \[
 TotalTime(n) = \frac{N}{n} \mathbb{I}_{T>n(t_c+t_{exec})} \left[ t_s + nt_c + nt_{exec}  + t_e \right]
@@ -388,7 +411,7 @@ of this function.
 
 We describe how our design could be extended to spot instances
 on EC2 easily, with a few twists. Compared with a Condor-based
-environment, spot instances lack the ability the automatically
+environment, spot instances lack the ability to automatically
 schedule a job (e.g., copy data, execute, and copy data back
 to master). Therefore, we twist our Condor-based implementation
 in the following ways.
@@ -399,7 +422,7 @@ that pings the master IP, which is stored in the AMI; (2) it
 automatically downloads a chunk of jobs from an address provided
 by the master; (3) it starts execution of a binary that is
 already in the AMI; (4) it copies results back when finished
-and evicted.
+or evicted.
 \item {\bf Master Worker.} The master worker has a simple twist
 that it manages the copy of jobs to the remote worker by itself
 by passing the local path name to enable \texttt{scp} from 
@@ -442,12 +465,12 @@ resize the images in ImageSize into 224$\times$224, the whole
 corpus is 46GB.
 
 \paragraph*{Protocol} We execute the DNN application with the
-code we described in previous sections. We select the time with
+code we described in previous sections. We select the chunk size with
 our analytic model with deterministic failure. The master
 machine has two 6-core 2.4GHz Xeon CPUs and 128GB RAM.
 We record the time for one training epoch of both corpus
 and also calculate the number of floating point operations
-we can do per second (GFLOPS). Because existing framework
+we can do per second (FLOPS). Because existing framework
 cannot be installed on Condor, it is hard to compare with them.
 Therefore, we compare our system with a single-GPU implementation
 with Nvidia Titan, one of the toppest GPUs available on the market.
@@ -458,7 +481,7 @@ GPU, we are 3.1$\times$ faster. At peak time, we harvest
 2.6K cores on Condor, and around 12T FLOPS. It is not surprising
 that our distributed implementation is only 3 times faster
 than a single GPU for two reasons. First, a single GPU contains
-more than 20000 computation units, and therefore is of roughly
+more than 2000 computation units, and therefore is of roughly
 the same size as the number of cores we harvest on Condor.
 Second, many machines on Condor are relatively old, and only 12\%
 of the machines we harvested support AVX. For machines that
@@ -489,21 +512,22 @@ when we vary the chunk size. The choice of a suboptimal
 chunk size could be catastrophic and can be up to
 two orders of magnitude less efficient than the optimal choice.
 Our analytic model is able to select a near optimal
-chunk size, which is within 25\% of the optimal choice.
+chunk size, which is within 25\% of the efficiency of 
+the optimal choice.
 
 \subsection{Running on Amazon EC2}
 
 We report our preliminary result of running our prototype
-systems on Amazon EC2. We bid 100 c1.xlarge instances with 
+system on Amazon EC2. We bid 100 c1.xlarge instances with 
 the price of \$0.1. Each c1.xlarge instance has
 4 virtual CPU, and we also find that AVX2 is supported, and
 therefore, the peak performance is 16 floating point
-operation per cycle for mused MUL and ADD instructions.
+operation per cycle for fused \texttt{MULPS} and \texttt{ADDPS} instructions.
 Our bided price is too high such that all 100 instances
 keep running for one hour. This gives us 4.5T FLOPS.
 Because we cost \$0.002 per second, this is 2250T FLOPS/\$.
 
-We hoped to lower the price and expect that to give us
+We hoped to lower the price and expect this will give us
 more interesting result. However, any sanely designed
 experiments in our mind would take more than \$100. Therefore,
 we did not conduct these experiments.
