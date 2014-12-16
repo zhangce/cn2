@@ -1,0 +1,38 @@
+\begin{thebibliography}{1}
+
+\bibitem{Google}
+J.~Dean, G.~Corrado, R.~Monga, K.~Chen, M.~Devin, M.~Mao, M.~Ranzato,
+  A.~Senior, P.~Tucker, K.~Yang, Q.~V. Le, and A.~Y. Ng.
+\newblock Large scale distributed deep networks.
+\newblock In P.~Bartlett, F.~Pereira, C.~Burges, L.~Bottou, and K.~Weinberger,
+  editors, {\em Advances in Neural Information Processing Systems 25}, pages
+  1232--1240. 2012.
+
+\bibitem{GraphLab:OSDI}
+J.~E. Gonzalez, Y.~Low, H.~Gu, D.~Bickson, and C.~Guestrin.
+\newblock Powergraph: Distributed graph-parallel computation on natural graphs.
+\newblock In {\em Proceedings of the 10th USENIX Conference on Operating
+  Systems Design and Implementation}, OSDI'12, pages 17--30, Berkeley, CA, USA,
+  2012. USENIX Association.
+
+\bibitem{Li:2014:OSDI}
+M.~Li, D.~G. Andersen, J.~W. Park, A.~J. Smola, A.~Ahmed, V.~Josifovski,
+  J.~Long, E.~J. Shekita, and B.-Y. Su.
+\newblock Scaling distributed machine learning with the parameter server.
+\newblock In {\em 11th USENIX Symposium on Operating Systems Design and
+  Implementation (OSDI 14)}, pages 583--598, Broomfield, CO, Oct. 2014. USENIX
+  Association.
+
+\bibitem{Yahoo}
+A.~Smola and S.~Narayanamurthy.
+\newblock An architecture for parallel topic models.
+\newblock {\em Proc. VLDB Endow.}, 3(1-2):703--710, Sept. 2010.
+
+\bibitem{Spark}
+R.~S. Xin, J.~Rosen, M.~Zaharia, M.~J. Franklin, S.~Shenker, and I.~Stoica.
+\newblock Shark: Sql and rich analytics at scale.
+\newblock In {\em Proceedings of the 2013 ACM SIGMOD International Conference
+  on Management of Data}, SIGMOD '13, pages 13--24, New York, NY, USA, 2013.
+  ACM.
+
+\end{thebibliography}
