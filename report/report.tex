@@ -2,6 +2,10 @@
 
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
+\usepackage{verbatim}
+\usepackage{listings}
+
+
 
 \title{Distributed Graph Processing for Machine Learning:\\
 The Case for Condor and Spot Instances}
@@ -160,10 +164,82 @@ We describe their difference as follows.
 \paragraph*{EC2 Spot Instances}
 
 
-\subsection{Language Extension}
+\subsection{User Interface}
+\subsubsection{Language Extension}
+
+\subsubsection{Vertex-centric APIs}
+A vertex in the graph is modeled by the \textsf{Vertex} data structure:
+\begin{verbatim}
+class Vertex {
+  NodeIdType nodeId;
+  T data;
+  vector<Vertex> neighbours;
+};
+\end{verbatim}
+We expose baisc operations of a vertex, including viewing and updating the 
+value of itself and its neighbours. The APIs are shown in 
+Table~\cite{table:api}. The APIs enable programmers to make queries 
+from the perspective of a vertex (in a vertex-centric way). 
+\begin{table}
+  \centering
+ \begin{tabular}{|c|c|}
+ \hline
+ \hline
+ Function & Usage\\
+ NodeIdType getNodeId() & Get the id of this vertex.\\
+ VertexData$\langle$T$\rangle$ getData() & Get the data of this vertex.\\
+ void getNeighbours(vector$\langle$Vertex$\langle$T$\rangle$ $\rangle$\& 
+neighbours) & Get all the neighbour information.\\
+ void updateValue(NodeIdType nodeId, VertexData$\langle$T$\rangle$ val) & Update 
+the value of vertex nodeId to val.\\
+ \hline
+ \hline
+ \end{tabular}
+ \caption{APIs and Usage}
+ \label{table:api}
+\end{table}
+
+\subsubsection{Example of Deep Neural Network for Image Recongnition}
+We illustrate the usage of the system by the example of deep	neural	network	
+for image recognition. In the \textbf{DNN}, we have two kind of vertices, one 
+being the vertex that stores the real image data and the other being the neural 
+network vertex that contains the parameters to learn. 
+We define \textsf{f.cpp} for the image vertices and \textsf{g.cpp} for the 
+"averagble" neural netowrk vertex, as shown in Listing~\ref{lst:f}~\ref{lst:g}.
+\begin{lstlisting}[language=java,basicstyle={\ttfamily\small},caption={f.cpp},label={lst:f},frame=single]
+ int main(){ 
+   // get vertex content
+   Image *img = getData<Image>();
+   // get neighbors’ content 
+   vector<Node> neighbours = getNeighbours(); 
+   Network *nw = getData<Network>(&neighbours[0]); 
+   NodeId nwId = nw.nodeId;
+   // do training of neural network
+   Layer *layer1 = nw->layers[0];
+   Layer *layer6 = nw->layers[5];
+   layer6->ops[0]->label = img->label; for (int i = 0; i < 4; ++i) {
+   layer1->ops[i]->inputs[0] = img->content; }
+   nw->forward();
+   nw->backward();
+   // write back new content 
+   updateValue<Network>(nwId, nw);
+ }
+\end{lstlisting}
+\begin{lstlisting}[language=java,basicstyle={\ttfamily\small},caption={g.cpp},label={lst:g},frame=single]
+ int main(){ 
+   // get two replicas 
+   Network *nw1 = getData<Network>(); 
+   Network *nw2 = getData<Network>();
+   // do the average 
+   nw1->avg_with(nw2); 
+   nw2->copy_from(nw1);
+   // write back new content 
+   updateValue<Network>(getNodeId(), nw1);
+ } 
+\end{lstlisting}
 
 \subsection{Execution Model}
-
+We have two kinds of vertices and also two kinds of workers. 
 \section{Performance Study}
 
 \bibliographystyle{abbrv}
