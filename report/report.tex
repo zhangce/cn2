@@ -2,6 +2,7 @@
 
 \usepackage[margin=1in]{geometry}
 \usepackage{graphicx}
+\usepackage{amsfonts}
 
 \title{Distributed Graph Processing for Machine Learning:\\
 The Case for Condor and Spot Instances}
@@ -151,20 +152,123 @@ Figure~\ref{fig:env} illustrates the difference between
 a dedicated cluster, Condor instances, and EC2 instances.
 We describe their difference as follows.
 
-\paragraph*{Dedicated Cluster}
+\paragraph*{Dedicated Cluster} The dedicated cluster
+that existing work assumes usually contains two components:
+(1) a set of master machines; and (2) a set of worker machines.
+In some frameworks, master machines and worker machines
+could overlap. A dedicated cluster starts from a given
+set of machines, and when the job starts, this number is
+known to the system. Therefore, one could use techniques
+like consistent hashing to allocate resources. Faults
+are assumed for both worker and master, and therefore,
+one could use techniques like chain replication. However,
+the failure rate is usually low compared with the two scenario
+that we are going to discuss later.
 
+\paragraph*{Condor} Figure~\ref{fig:env}(b) illustrates
+the case for Condor. Similar to dedicated cluster, there
+are workers and masters. The cluster starts with only
+master machines and zero workers. During execution,
+workers are added to the pool periodically, but also
+fail periodically. According to the statistics we get
+from OSG, the same worker usually has a life span around
+45 minutes, which means, after 45 minutes a worker will
+exit. Usually, workers cannot communicate with each other
+because they are behind the firewall of different organizations
+cross the country.
 
-\paragraph*{Condor}
-
-
-\paragraph*{EC2 Spot Instances}
-
+\paragraph*{EC2 Spot Instances} The spot instances
+of EC2 has similar structure with Condor. New instances
+will be added into the pool when the bidding price is
+higher than the market price; and instances will be removed
+from the pool when the bidding price is lower than
+the market price. Because the market price is unknown and
+keep changing dynamically, there is no way for the master
+to know beforehand the number of worker machines.
 
 \subsection{Language Extension}
 
 \subsection{Execution Model}
 
+
+\paragraph*{Deciding the Chunk Size}
+
+One key parameter that we need to decide is the
+chunk size, that is the number of nodes we can
+put in a single job. We apply standard queueing
+theory to estimate this parameter. 
+
+Let $N$ be the total number of vertex, and $t_{exec}$
+be the time that a single vertex needs to
+finish execution. Let $t_s$ and $t_e$ be the time
+that Condor needs to start and end a job. Let
+$t_c$ be the time that each vertex require to copy
+to the worker.
+Let $T$ be the time that a Condor worker can execute
+before getting killed. Let $n$ be the number of 
+vertex we put in a single Condor job.
+%
+We have that there are $N/n$ Condor jobs, each of which
+takes $nt_{exec}$ time to execute. 
+
+\subparagraph*{Infinite Bandwidth with Deterministic Failure}
+
+We first assume that the master has infinite bandwidth,
+and therefore, no matter how many jobs we have, they
+do not interfere with each other. In this case, let
+$M$ be the number of Condor machines we get, the
+total execution time is
+\[
+TotalTime(n) = \frac{N}{n} \mathbb{I}_{T>n(t_c+t_{exec})} \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+If we want to maximize
+\[
+\frac{Nt_{exec}}{TotalTime(n)}
+\]
+we just need to set
+\[
+T=n(t_c+t_{exec}).
+\]
+
+\subparagraph*{Infinite Bandwidth with Stochastic Failure}
+
+Our previous analysis assumes that Condor jobs fail
+deterministically after time $T$. A more tight and realistic
+analysis is to assume this parameter is stochastic. For example,
+let $T\sim\mathcal{N}(\mu, \sigma^2)$ be a Gaussian random variable.
+Now $TotalTime(n)$ becomes a random variable.
+Instead of analyzing this random variable as a whole, let's
+look at a single job.
+\[
+TimeOfAJob(n) = \mathbb{I}_{T>n(t_c+t_{exec})} \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+The expectation of this random variable is
+\[
+\mathbb{E}\left[TimeOfAJob(n)\right] = \Pr[T>n(t_c+t_{exec})] \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+Let $\Phi_{\mu,\sigma}$ be the quantile function
+of the Gaussian distribution, we have
+\[
+\mathbb{E}\left[TimeOfAJob(n)\right] = \Phi(n(t_c+t_{exec})) \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+Trivially, the expectation of $TotalTime(n)$ becomes
+\[
+\mathbb{E}\left[TotalTime(n)\right] = \frac{N}{n} \Phi(n(t_c+t_{exec})) \left[ t_s + nt_c + nt_{exec}  + t_e \right]
+\]
+The best chunk size should be the one that minimizes this 
+expectation. However, it is well-known that the quantile
+function of Gaussian cannot be expressed in closed form in 
+terms of elementary functions; therefore, one can use
+standard numerical methods to search for (local) minimal
+of this function.
+
+
 \section{Performance Study}
+
+We describe 
+
+
+
 
 \bibliographystyle{abbrv}
 \bibliography{report}
